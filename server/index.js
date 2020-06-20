@@ -1,76 +1,73 @@
 // + Refresh_token solo se devuelve en la primera autorización
-'use strict'
+"use strict";
 
-const express = require('express');
-const http = require('http');
-const jwt = require('jsonwebtoken');
-const fs = require("fs").promises;
-const readline = require("readline");
-const { google } = require("googleapis");
+const express = require("express");
+const http = require("http");
+const oauth2 = require("./app/utils/oauth");
+//const fs = require("fs").promises;
+//const readline = require("readline");
+//const { google } = require("googleapis");
 
 const app = express();
+const httpServer = http.Server(app);
+
 app.use(express.json());
+app.use(
+  express.urlencoded({
+    extended: false,
+  })
+);
+app.use("/api/v1", require("./app/routes/v1"));
 
-const server = app.listen(5000, () => {
-  console.log(`Listening http://localhost:${server.address().port}`);
-});
+(async () => {
+  try {
+    oauth2.initOAuth2();
+    const server = await httpServer.listen(8080);
+    console.log(`[SUCCESS] webserver is running on ${server.address().port}.`);
+  } catch (err) {
+    console.log(err);
+    process.exit(0);
+  }
+})();
 
-// Si se modifican estos 'scopes', eliminar el 'token.json'
-// Genera urls que solicitan permisos para:
-const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+//const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
 
 // El 'token.json' almacena el access y refresh token del usuario,
 // y es creado automáticamente cuando el flujo de autorización se completa por primera vez
-const TOKEN_PATH = "token.json";
-
-// Carga el 'client_secret' desde 'credentials.json'
-const loadKeys = async () => {
+//const TOKEN_PATH = "token.json"; // no necesario
+/*
+const loadCredentials = async () => {
   try {
     const content = await fs.readFile("credentials.json");
+    // Autoriza a un cliente credenciales, luego llama a la api de gmail
     authorize(JSON.parse(content), listLabels);
-  }
-  catch (error) {
+  } catch (error) {
     return console.log("Error loading client secret file:", error);
   }
-}
-
-//loadKeys();
-
-/*
-fs.readFile("credentials.json", (err, content) => {
-  if (err) return console.log("Error loading client secret file:", err);
-  // Autoriza a un cliente credenciales, luego llama a la gmail api
-  //console.log("content: ", content);
-  //console.log("listLabels: ", listLabels);
-  authorize(JSON.parse(content), listLabels);
-});*/
+};*/
 
 /**
  * Crea un cliente OAuth2 con las credenciales dadas, y luego ejecuta el callback
  * @param {Object} credentials Credenciales de autorización del cliente
  * @param {function} callback Callback para llamar al cliente autorizado
  */
-function authorize(credentials, callback) {
-  console.log("credentials: ", credentials);
+/*
+async function authorize(credentials, callback) {
   const { client_secret, client_id, redirect_uris } = credentials.web;
-  console.log("client_secret: ", client_secret);
-  console.log("client_id: ", client_id);
-  console.log("redirect_uris: ", redirect_uris);
   const oAuth2Client = new google.auth.OAuth2(
     client_id,
     client_secret,
     redirect_uris[0]
   );
-
-  // Comprueba si se ha almacenado un token
-  fs.readFile(TOKEN_PATH, (err, token) => {
-    console.log("token: ", token);
-    console.log("token parsed: ", JSON.parse)
-    if (err) return getNewToken(oAuth2Client, callback);
+  try {
+    // Comprueba si se ha almacenado un token
+    const token = await fs.readFile(TOKEN_PATH);
     oAuth2Client.setCredentials(JSON.parse(token));
     callback(oAuth2Client);
-  });
-}
+  } catch (error) {
+    getNewToken(oAuth2Client, callback);
+  }
+}*/
 
 /**
  * Obtiene y almacena un nuevo token después de solicitar la autorización de usuario,
@@ -78,9 +75,9 @@ function authorize(credentials, callback) {
  * @param {google.auth.OAuth2} oAuth2Client Cliente de OAuth al que hay que darle el token
  * @param {getEventsCallback} callback Callback para el cliente autorizado
  */
-function getNewToken(oAuth2Client, callback) {
+/*function getNewToken(oAuth2Client, callback) {
   const authUrl = oAuth2Client.generateAuthUrl({
-    access_type: "offline",
+    access_type: "offline", // para obtener un refresh_token?
     scope: SCOPES,
   });
 
@@ -108,12 +105,12 @@ function getNewToken(oAuth2Client, callback) {
     });
   });
 }
-
+*/
 /**
  * Enlista los labels de la cuenta de usuario
  * @param {google.auth.OAuth2} auth Cliente OAuth autorizado
  */
-async function listLabels(auth) {
+/*async function listLabels(auth) {
   try {
     const gmail = google.gmail({ version: "v1", auth: auth });
     const res = await gmail.users.labels.list({ userId: "me" });
@@ -123,8 +120,7 @@ async function listLabels(auth) {
     } else {
       console.log("No labels found.");
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.log("The API returned an error: " + err);
   }
-}
+}*/
