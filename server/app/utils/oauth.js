@@ -7,12 +7,11 @@ const { google } = require("googleapis");
 
 const SCOPES = require("./scopes");
 const TOKEN_PATH = "token.json";
-const gmail = google.gmail({ version: "v1", auth });
 
 const initOAuth2 = async () => {
   try {
     const credentials = await fs.readFile("credentials.json");
-    console.log("crendetials: ", credentials);
+    //console.log("crendetials: ", credentials);
     const oAuth2Client = await authorize(JSON.parse(credentials));
     //console.log("oAuth2Client: ", oAuth2Client);
     console.log(`[SUCCESS] OAuth2 initialized.`);
@@ -97,6 +96,7 @@ const getNewToken = async (oAuth2Client) => {
  */
 async function listLabels(auth) {
   try {
+    const gmail = google.gmail({ version: "v1", auth });
     console.log("auth: ", auth);
     const res = await gmail.users.labels.list({ userId: "me" }); // aqui muere
     console.log("cague.....");
