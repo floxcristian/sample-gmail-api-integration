@@ -1,24 +1,22 @@
 // https://developers.google.com/identity/protocols/oauth2/javascript-implicit-flow#oauth-2.0-endpoints
-"use strict";
+'use strict';
 
-const fs = require("fs").promises;
-const readline = require("readline");
-const { google } = require("googleapis");
+const fs = require('fs').promises;
+const readline = require('readline');
+const { google } = require('googleapis');
 
-const SCOPES = require("./scopes");
-const TOKEN_PATH = "token.json";
+const SCOPES = require('./scopes');
+const TOKEN_PATH = 'token.json';
+
+//let oAuth2Client;
 
 const initOAuth2 = async () => {
   try {
-    const credentials = await fs.readFile("credentials.json");
-    //console.log("crendetials: ", credentials);
-    const oAuth2Client = await authorize(JSON.parse(credentials));
-    //console.log("oAuth2Client: ", oAuth2Client);
+    const credentials = await fs.readFile('credentials.json');
+    await authorize(JSON.parse(credentials));
     console.log(`[SUCCESS] OAuth2 initialized.`);
-    listLabels(oAuth2Client);
   } catch (error) {
-    console.log("xx: ", error);
-    return console.log("Error loading client secret file:", error);
+    console.log('initOAuth2 error: ', error);
   }
 };
 
@@ -27,20 +25,19 @@ const initOAuth2 = async () => {
  * @param {Object} credentials Credenciales de autorización del cliente
  */
 const authorize = async (credentials) => {
-  const { client_secret, client_id, redirect_uris } = credentials.web;
-  const oAuth2Client = new google.auth.OAuth2(
-    client_id,
-    client_secret,
-    redirect_uris[0]
-  );
+  let oAuth2Client;
   try {
-    // Comprueba si se ha almacenado un token
-    const token = await fs.readFile(TOKEN_PATH);
-    oAuth2Client.setCredentials(JSON.parse(token));
+    const { client_secret, client_id, redirect_uris } = credentials.web;
+    oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+
+    const token = await fs.readFile(TOKEN_PATH); // comprueba si se ha almacenado un token
+    oAuth2Client.setCredentials(JSON.parse(token)); // establece las credenciales
+    listLabels(oAuth2Client);
     return oAuth2Client;
   } catch (error) {
     await getNewToken(oAuth2Client);
-    console.log("yy: ", error);
+    listLabels(oAuth2Client);
+    //getUserDetails(oAuth2Client);
   }
 };
 
@@ -50,66 +47,59 @@ const authorize = async (credentials) => {
  * @param {google.auth.OAuth2} oAuth2Client Cliente de OAuth al que hay que darle el token
  */
 const getNewToken = async (oAuth2Client) => {
-  const authUrl = oAuth2Client.generateAuthUrl({
-    access_type: "offline", // para obtener un refresh_token?
-    scope: SCOPES,
-  });
-
-  console.log("Authorize this app by visiting this url:", authUrl);
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
   try {
-    const code = await question("Enter the code from that page here: ", rl);
-    rl.close();
-    const token = await oAuth2Client.getToken(code); // access_token dura 1 hora?
-    oAuth2Client.setCredentials(token);
-    // Almacena el token en 'token.json'
-    await fs.writeFile(TOKEN_PATH, JSON.stringify(token));
-    console.log("Token stored to", TOKEN_PATH);
-  } catch (err) {
-    console.log("zz: ", err);
-  }
-
-  /*
-  rl.question("Enter the code from that page here: ", (code) => {
-    rl.close();
-
-    oAuth2Client.getToken(code, (err, token) => {
-      if (err) return console.error("Error retrieving access token", err);
-      oAuth2Client.setCredentials(token);
-      // Almacena el token en disco para posteriores ejecuciones del programa
-      fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-        if (err) return console.error(err);
-        console.log("Token stored to", TOKEN_PATH);
-      });
-      callback(oAuth2Client);
+    const authUrl = oAuth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: SCOPES,
     });
-  });*/
+
+    console.log('Authorize this app by visiting this url:', authUrl);
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    const code = await question('Enter the code from that page here: ', rl);
+    rl.close();
+    const { tokens } = await oAuth2Client.getToken(code);
+    oAuth2Client.setCredentials(tokens);
+    await fs.writeFile(TOKEN_PATH, JSON.stringify(tokens)); // almacena el token en 'token.json'
+    console.log('Token stored to', TOKEN_PATH);
+  } catch (err) {
+    console.log('getNewToken error: ', err);
+  }
 };
 
 /**
  * Enlista los labels de la cuenta de usuario
  * @param {google.auth.OAuth2} auth Cliente OAuth autorizado
  */
-async function listLabels(auth) {
+const listLabels = async (auth) => {
   try {
-    const gmail = google.gmail({ version: "v1", auth });
-    console.log("auth: ", auth);
-    const res = await gmail.users.labels.list({ userId: "me" }); // aqui muere
-    console.log("cague.....");
+    const gmail = google.gmail({ version: 'v1', auth });
+    const res = await gmail.users.labels.list({ userId: 'me' });
+
     const labels = res.data.labels;
     if (labels.length) {
       labels.forEach((label) => console.log(`- ${label.name}`));
-    } else {
-      console.log("No labels found.");
-    }
+    } else console.log('No labels found.');
   } catch (error) {
-    console.log("The API returned an error: " + error);
+    console.log('listLabels error: ' + error);
   }
-}
+};
+
+const getUserDetails = async (auth) => {
+  try {
+    const oauth2 = google.oauth2({
+      auth,
+      version: 'v2',
+    });
+    const usr_info = await oauth2.userinfo.get({ auth });
+    return usr_info;
+  } catch (error) {
+    console.log('getUserDetails error: ', error);
+  }
+};
 
 const question = (questionText, rl) => {
   return new Promise((resolve) => {
